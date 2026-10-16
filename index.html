@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="UTF-8">
+    <title>Runbook & Cutover Task Dashboard</title>
+    <!-- SheetJS, Chart.js, болон Chart.js Datalabels Plugin -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            margin: 0; 
+            padding: 30px; 
+            background-color: #f8f9fa; 
+            color: #212529; 
+        }
+        
+        h1 { 
+            font-size: 24px; 
+            font-weight: 600; 
+            color: #1a1f2c; 
+            margin-top: 0; 
+            margin-bottom: 20px; 
+        }
+
+        .upload-card {
+            background: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        /* SHEET TABS DESIGN (Excel-ийн Sheet-үүдийг сонгох) */
+        .sheet-tabs {
+            display: flex;
+            gap: 8px;
+            background: #e2e8f0;
+            padding: 6px 8px 0 8px;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 0;
+            overflow-x: auto;
+        }
+
+        .sheet-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #475569;
+            background: #cbd5e1;
+            border: none;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sheet-btn:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        .sheet-btn.active {
+            background: #ffffff;
+            color: #2563eb;
+            border-top: 2px solid #2563eb;
+        }
+
+        .sheet-container {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0 0 8px 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        .filter-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .filter-select {
+            padding: 6px 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 14px;
+            background: #fff;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 6px;
+            border: 1px solid #d0d7de;
+            background-color: #ffffff;
+            color: #24292f;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 0 rgba(27,31,36,0.04);
+        }
+
+        .btn:hover {
+            background-color: #f3f4f6;
+            border-color: #1b1f2426;
+        }
+
+        .btn-primary {
+            background-color: #2563eb;
+            color: #ffffff;
+            border-color: #2563eb;
+        }
+
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+
+        .btn-danger {
+            background-color: transparent;
+            color: #dc2626;
+            border: 1px solid transparent;
+            padding: 4px 8px;
+            font-size: 13px;
+        }
+
+        .btn-danger:hover {
+            background-color: #fee2e2;
+            border-color: #fca5a5;
+            border-radius: 4px;
+        }
+
+        /* VIEW TABS (Жагсаалт ба Диаграм) */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #64748b;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover { color: #2563eb; }
+
+        .tab-btn.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* METRIC CARDS & PROGRESS BAR */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .metric-card {
+            background: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .metric-card .title {
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .metric-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .progress-container {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 10px;
+            height: 10px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #22c55e;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .table-container {
+            width: 100%;
+            max-height: 60vh;
+            overflow-y: auto;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .table-container::-webkit-scrollbar { width: 8px; height: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f1f1; }
+        .table-container::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            text-align: left;
+            table-layout: auto; 
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            padding: 12px 14px;
+            border-bottom: 1px solid #e2e8f0;
+            border-right: 1px solid #f1f5f9;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 0;
+            border-bottom: 1px solid #f1f5f9;
+            border-right: 1px solid #f1f5f9;
+            color: #334155;
+            vertical-align: top;
+        }
+
+        .cell-input {
+            width: 100%;
+            min-height: 42px;
+            padding: 10px 12px;
+            border: 1px solid transparent;
+            background: transparent;
+            font-family: inherit;
+            font-size: 14px;
+            color: inherit;
+            outline: none;
+            resize: none;
+            display: block;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow: hidden;
+        }
+
+        .cell-input:focus {
+            background: #ffffff !important;
+            border-color: #3b82f6 !important;
+            box-shadow: inset 0 0 0 1px #3b82f6;
+            border-radius: 4px;
+        }
+
+        .cell-select {
+            width: 100%;
+            height: 42px;
+            padding: 8px 10px;
+            border: 1px solid transparent;
+            background: transparent;
+            font-family: inherit;
+            font-size: 14px;
+            color: inherit;
+            outline: none;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .cell-select:focus {
+            background: #ffffff !important;
+            border-color: #3b82f6 !important;
+            box-shadow: inset 0 0 0 1px #3b82f6;
+            border-radius: 4px;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 42px;
+            width: 50px;
+        }
+
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #2563eb;
+            cursor: pointer;
+        }
+
+        tr.status-done { background-color: #f0fdf4; }
+        tr.status-done td { border-bottom-color: #dcfce7; }
+        tr.status-pending { background-color: #fefce8; }
+        tr.status-pending td { border-bottom-color: #fef9c3; }
+
+        tr:hover { background-color: #f8fafc; }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .chart-card {
+            background: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .chart-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a1f2c;
+            margin-top: 0;
+            margin-bottom: 15px;
+            width: 100%;
+            text-align: left;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            max-height: 320px;
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1> Runbook Dashboard</h1>
+
+    <div class="upload-card">
+        <label for="excelFile"><b>📁 Excel файл оруулах:</b></label>
+        <input type="file" id="excelFile" accept=".xlsx, .xls" onchange="handleFileSelect(event)">
+    </div>
+
+    <!-- SHEET TABS (Энд Excel-ийн Sheet-үүд товчлуур болж гарч ирнэ) -->
+    <div class="sheet-tabs" id="sheetTabsHeader" style="display: none;"></div>
+
+    <!-- MAIN SHEET CONTAINER -->
+    <div class="sheet-container" id="mainSheetContainer" style="display: none;">
+        
+        <!-- View Tabs (Жагсаалт ба Диаграм) -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchViewTab(event, 'tableTab')"> Work List</button>
+            <button class="tab-btn" onclick="switchViewTab(event, 'chartsTab')">📊 Diagram & Stat</button>
+        </div>
+
+        <!-- TAB 1: TABLE -->
+        <div id="tableTab" class="tab-content active">
+            <div class="filter-card">
+                <strong>🔍 Шүүх:</strong>
+                
+                <div class="filter-group">
+                    <label for="statusFilter">Төлөв (Status):</label>
+                    <select id="statusFilter" class="filter-select" onchange="renderTable()">
+                        <option value="">Бүгд</option>
+                        <option value="Done">Done</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Empty">-- Хоосон --</option>
+                    </select>
+                </div>
+
+                <div class="filter-group" id="dateFilterGroup" style="display: none;">
+                    <label id="dateFilterLabel" for="dateFilter">Огноо:</label>
+                    <select id="dateFilter" class="filter-select" onchange="renderTable()">
+                        <option value="">Бүгд</option>
+                    </select>
+                </div>
+
+                <button class="btn" style="padding: 5px 10px; font-size: 13px;" onclick="resetFilters()">Шүүлтүүр цэвэрлэх</button>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="addRow()">➕ Шинэ мөр нэмэх</button>
+                <button class="btn" onclick="exportToExcel()">📥 Бүх Sheet-ийг Excel болгож татах</button>
+            </div>
+
+            <div class="table-container">
+                <table id="taskTable">
+                    <thead>
+                        <tr id="tableHeader"></tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 2: CHARTS & METRICS -->
+        <div id="chartsTab" class="tab-content">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="title">📌 Нийт ажил</div>
+                    <div class="value" id="mTotal">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="title">Хийсэн (Done)</div>
+                    <div class="value" id="mDone" style="color: #22c55e;">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="title">Хүлээгдэж буй (Pending)</div>
+                    <div class="value" id="mPending" style="color: #eab308;">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="title">Гүйцэтгэл (%)</div>
+                    <div class="value" id="mPercent" style="color: #2563eb;">0%</div>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="mProgressBar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>📊 Төлөвийн харьцаа</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3 id="dateChartTitle">📅 Огноогоор (Ажлын тоо)</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="dateChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        Chart.register(ChartDataLabels);
+
+        let workbookSheets = {}; // Бүх Sheet-үүдийн өгөгдөл
+        let activeSheetName = ""; // Одоо идэвхтэй байгаа Sheet
+        let dateColName = "";
+        let statusChartInstance = null;
+        let dateChartInstance = null;
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                workbookSheets = {};
+
+                // Бүх Sheet-үүдийг уншиж бүтэцэд оруулах
+                workbook.SheetNames.forEach(sheetName => {
+                    const worksheet = workbook.Sheets[sheetName];
+                    let excelData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                    if (excelData.length > 0) {
+                        let rawCols = Object.keys(excelData[0]);
+                        rawCols = rawCols.filter(c => c !== "Seq" && c !== "Done");
+                        
+                        let tableColumns = ["Seq", "Done", ...rawCols];
+                        if (!tableColumns.includes("Status")) {
+                            tableColumns.push("Status");
+                        }
+
+                        excelData.forEach((row, index) => {
+                            if (row["Seq"] === undefined || row["Seq"] === "") row["Seq"] = index + 1;
+                            let status = String(row["Status"] || "").trim().toLowerCase();
+                            row["Done"] = (status === "done" || status === "хийсэн" || status === "хийгдсэн");
+                        });
+
+                        workbookSheets[sheetName] = {
+                            data: excelData,
+                            columns: tableColumns
+                        };
+                    }
+                });
+
+                const sheetNames = Object.keys(workbookSheets);
+                if (sheetNames.length === 0) {
+                    alert("Файл хоосон байна!");
+                    return;
+                }
+
+                // Sheet-үүдийн товчлуурыг үүсгэх
+                renderSheetTabs(sheetNames);
+                
+                // Эхний Sheet-ийг сонгох
+                switchSheet(sheetNames[0]);
+
+                document.getElementById("sheetTabsHeader").style.display = "flex";
+                document.getElementById("mainSheetContainer").style.display = "block";
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Sheet сонгох Tab үүсгэх
+        function renderSheetTabs(sheetNames) {
+            const container = document.getElementById("sheetTabsHeader");
+            container.innerHTML = "";
+
+            sheetNames.forEach(name => {
+                let btn = document.createElement("button");
+                btn.className = "sheet-btn" + (name === activeSheetName ? " active" : "");
+                btn.innerText = "📄 " + name;
+                btn.onclick = () => switchSheet(name);
+                container.appendChild(btn);
+            });
+        }
+
+        // Sheet хооронд шилжих
+        function switchSheet(sheetName) {
+            activeSheetName = sheetName;
+            
+            // Active Sheet Tab шинэчлэх
+            document.querySelectorAll(".sheet-btn").forEach(btn => {
+                btn.classList.toggle("active", btn.innerText.includes(sheetName));
+            });
+
+            setupDateFilter();
+            resetFilters();
+        }
+
+        function switchViewTab(evt, tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            evt.currentTarget.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function setupDateFilter() {
+            if (!activeSheetName || !workbookSheets[activeSheetName]) return;
+
+            let sheet = workbookSheets[activeSheetName];
+            dateColName = sheet.columns.find(col => 
+                ["date", "огноо", "time", "цаг", "day"].some(kw => col.toLowerCase().includes(kw))
+            ) || "";
+
+            const dateGroup = document.getElementById("dateFilterGroup");
+            const dateSelect = document.getElementById("dateFilter");
+            const dateLabel = document.getElementById("dateFilterLabel");
+
+            if (dateColName) {
+                dateLabel.innerText = `${dateColName}:`;
+                dateSelect.innerHTML = '<option value="">Бүгд</option>';
+
+                let uniqueDates = [...new Set(sheet.data.map(row => String(row[dateColName] || "").trim()))].filter(v => v !== "");
+                uniqueDates.sort();
+
+                uniqueDates.forEach(d => {
+                    let opt = document.createElement("option");
+                    opt.value = d;
+                    opt.innerText = d;
+                    dateSelect.appendChild(opt);
+                });
+
+                dateGroup.style.display = "flex";
+                document.getElementById("dateChartTitle").innerText = `📅 ${dateColName} (Ажлын тоо)`;
+            } else {
+                dateGroup.style.display = "none";
+                document.getElementById("dateChartTitle").innerText = `📅 Огноогоор (Ажлын тоо)`;
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById("statusFilter").value = "";
+            document.getElementById("dateFilter").value = "";
+            renderTable();
+        }
+
+        function autoResizeTextarea(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        }
+
+        function renderTable() {
+            if (!activeSheetName || !workbookSheets[activeSheetName]) return;
+
+            const sheet = workbookSheets[activeSheetName];
+            const headerTr = document.getElementById("tableHeader");
+            const bodyTb = document.getElementById("tableBody");
+            
+            headerTr.innerHTML = "";
+            bodyTb.innerHTML = "";
+
+            sheet.columns.forEach(col => {
+                let th = document.createElement("th");
+                th.innerText = (col === "Done") ? "✓" : col;
+                headerTr.appendChild(th);
+            });
+            let thAction = document.createElement("th");
+            thAction.innerText = "";
+            thAction.style.width = "50px";
+            headerTr.appendChild(thAction);
+
+            const selectedStatus = document.getElementById("statusFilter").value.toLowerCase();
+            const selectedDate = document.getElementById("dateFilter").value;
+
+            let filteredData = sheet.data.filter(row => {
+                let rowStatus = String(row["Status"] || "").trim().toLowerCase();
+                if (selectedStatus === "done" && rowStatus !== "done" && rowStatus !== "хийсэн" && rowStatus !== "хийгдсэн") return false;
+                if (selectedStatus === "pending" && rowStatus !== "pending") return false;
+                if (selectedStatus === "empty" && rowStatus !== "") return false;
+
+                if (selectedDate && dateColName) {
+                    let rowDate = String(row[dateColName] || "").trim();
+                    if (rowDate !== selectedDate) return false;
+                }
+
+                return true;
+            });
+
+            if (filteredData.length === 0) {
+                let tr = document.createElement("tr");
+                let td = document.createElement("td");
+                td.colSpan = sheet.columns.length + 1;
+                td.style.textAlign = "center";
+                td.style.padding = "25px";
+                td.style.color = "#94a3b8";
+                td.innerText = "Шүүлтүүрт тохирох дата олдсонгүй.";
+                tr.appendChild(td);
+                bodyTb.appendChild(tr);
+                updateChartsAndMetrics(filteredData);
+                return;
+            }
+
+            filteredData.forEach((row) => {
+                let rowIndex = sheet.data.indexOf(row);
+                let tr = document.createElement("tr");
+
+                let statusVal = String(row["Status"] || "").trim().toLowerCase();
+                if (statusVal === "done" || statusVal === "хийсэн" || statusVal === "хийгдсэн") {
+                    tr.className = "status-done";
+                } else if (statusVal === "pending") {
+                    tr.className = "status-pending";
+                }
+
+                sheet.columns.forEach(col => {
+                    let td = document.createElement("td");
+
+                    if (col === "Done") {
+                        let div = document.createElement("div");
+                        div.className = "checkbox-container";
+                        let checkbox = document.createElement("input");
+                        checkbox.type = "checkbox";
+                        checkbox.checked = Boolean(row[col]);
+                        checkbox.onchange = function() {
+                            row[col] = checkbox.checked;
+                            row["Status"] = checkbox.checked ? "Done" : "";
+                            renderTable();
+                        };
+                        div.appendChild(checkbox);
+                        td.appendChild(div);
+                    } 
+                    else if (col === "Status") {
+                        let select = document.createElement("select");
+                        select.className = "cell-select";
+                        
+                        let options = ["", "Done", "Pending"];
+                        options.forEach(optVal => {
+                            let option = document.createElement("option");
+                            option.value = optVal;
+                            option.innerText = optVal === "" ? "-- Хоосон --" : optVal;
+                            if (String(row[col]).toLowerCase() === optVal.toLowerCase() || (optVal === "" && !row[col])) {
+                                option.selected = true;
+                            }
+                            select.appendChild(option);
+                        });
+
+                        select.onchange = function() {
+                            row[col] = select.value;
+                            let val = select.value.trim().toLowerCase();
+                            row["Done"] = (val === "done" || val === "хийсэн" || val === "хийгдсэн");
+                            renderTable();
+                        };
+                        td.appendChild(select);
+                    } 
+                    else {
+                        let input = document.createElement("textarea");
+                        input.className = "cell-input";
+                        input.value = row[col] !== undefined ? row[col] : "";
+                        
+                        if (col === "Seq") {
+                            input.style.textAlign = "center";
+                        }
+
+                        setTimeout(() => autoResizeTextarea(input), 0);
+
+                        input.oninput = function() {
+                            row[col] = input.value;
+                            autoResizeTextarea(input);
+                        };
+                        td.appendChild(input);
+                    }
+                    tr.appendChild(td);
+                });
+
+                let tdAction = document.createElement("td");
+                tdAction.style.textAlign = "center";
+                tdAction.style.verticalAlign = "middle";
+                let delBtn = document.createElement("button");
+                delBtn.innerText = "✕";
+                delBtn.title = "Мөр устгах";
+                delBtn.className = "btn-danger";
+                delBtn.onclick = function() {
+                    sheet.data.splice(rowIndex, 1);
+                    setupDateFilter();
+                    renderTable();
+                };
+                tdAction.appendChild(delBtn);
+                tr.appendChild(tdAction);
+
+                bodyTb.appendChild(tr);
+            });
+
+            updateChartsAndMetrics(filteredData);
+        }
+
+        function updateChartsAndMetrics(data) {
+            let total = data.length;
+            let doneCount = 0;
+            let pendingCount = 0;
+            let emptyCount = 0;
+
+            data.forEach(row => {
+                let st = String(row["Status"] || "").trim().toLowerCase();
+                if (st === "done" || st === "хийсэн" || st === "хийгдсэн") doneCount++;
+                else if (st === "pending") pendingCount++;
+                else emptyCount++;
+            });
+
+            let percentage = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+            document.getElementById("mTotal").innerText = total;
+            document.getElementById("mDone").innerText = doneCount;
+            document.getElementById("mPending").innerText = pendingCount;
+            document.getElementById("mPercent").innerText = percentage + "%";
+            document.getElementById("mProgressBar").style.width = percentage + "%";
+
+            const ctxStatus = document.getElementById('statusChart').getContext('2d');
+            if (statusChartInstance) statusChartInstance.destroy();
+
+            statusChartInstance = new Chart(ctxStatus, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Done', 'Pending', 'Хоосон'],
+                    datasets: [{
+                        data: [doneCount, pendingCount, emptyCount],
+                        backgroundColor: ['#22c55e', '#eab308', '#94a3b8'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        datalabels: {
+                            color: '#fff',
+                            font: { weight: 'bold', size: 13 },
+                            formatter: (value) => value > 0 ? value : ''
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+
+            let dateCounts = {};
+            if (dateColName) {
+                data.forEach(row => {
+                    let d = String(row[dateColName] || "Хоосон").trim();
+                    if (!d) d = "Хоосон";
+                    dateCounts[d] = (dateCounts[d] || 0) + 1;
+                });
+            }
+
+            let dateLabels = Object.keys(dateCounts);
+            let dateValues = Object.values(dateCounts);
+
+            const ctxDate = document.getElementById('dateChart').getContext('2d');
+            if (dateChartInstance) dateChartInstance.destroy();
+
+            dateChartInstance = new Chart(ctxDate, {
+                type: 'bar',
+                data: {
+                    labels: dateLabels,
+                    datasets: [{
+                        label: 'Ажлын тоо',
+                        data: dateValues,
+                        backgroundColor: '#2563eb',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top',
+                            color: '#1e293b',
+                            font: { weight: 'bold', size: 12 },
+                            formatter: (value) => value > 0 ? value : ''
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grace: '10%',
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function addRow() {
+            if (!activeSheetName || !workbookSheets[activeSheetName]) {
+                alert("Эхлээд Excel файлаа оруулна уу!");
+                return;
+            }
+            let sheet = workbookSheets[activeSheetName];
+            let newRow = {};
+            sheet.columns.forEach(col => {
+                if (col === "Seq") {
+                    newRow[col] = sheet.data.length + 1;
+                } else if (col === "Done") {
+                    newRow[col] = false;
+                } else {
+                    newRow[col] = "";
+                }
+            });
+            sheet.data.push(newRow);
+            setupDateFilter();
+            renderTable();
+        }
+
+        function exportToExcel() {
+            const sheetNames = Object.keys(workbookSheets);
+            if (sheetNames.length === 0) {
+                alert("Татах дата байхгүй байна!");
+                return;
+            }
+
+            const workbook = XLSX.utils.book_new();
+
+            sheetNames.forEach(sheetName => {
+                let sheetData = workbookSheets[sheetName].data;
+                sheetData.sort((a, b) => (parseInt(a["Seq"]) || 0) - (parseInt(b["Seq"]) || 0));
+                
+                const worksheet = XLSX.utils.json_to_sheet(sheetData);
+                XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            });
+
+            XLSX.writeFile(workbook, "runbook_updated.xlsx");
+        }
+    </script>
+
+</body>
+</html>
