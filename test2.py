@@ -11,7 +11,7 @@ st.set_page_config(
 st.title("🚀 Runbook & Cutover Task Dashboard")
 st.markdown("---")
 
-EXCEL_FILE = r"D:\oyunerdene.ga\Oyu\python\runbook.xlsx"
+EXCEL_FILE = "runbook.xlsx"
 
 
 def load_data():
